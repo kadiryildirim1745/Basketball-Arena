@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <title>Basketball Arena</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            width: 90%;
+            height: 75%;
+            border: 1px solid black;
+            border-radius: 5%;
+        }
+        
+        #score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 30px;
+            color: rgb(19, 13, 31);
+            background-color: rgba(100, 99, 99, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        #intro {
+            width: 100%;
+            height: 100%;
+            background-color: #9eb6c2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin:2px;
+            padding: 2px;
+        
+        }
+        #intro h1 {
+            font-size: 36px;
+            color: #4a6fe7;
+        }
+
+        #intro p {
+            font-size: 24px;
+            color: #f3ebeb;
+            text-align: center;
+        }
+        @media (max-width:1600px){
+            #intro p{ 
+                font-size: 18px;
+            }
+            #intro h1{
+                font-size: 24px;
+            }
+        }
+
+        #intro button {
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #3fbb73;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;            
+        }
+        #end{
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            font-size: 20px;
+            background-color: #3fbb73;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer; 
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="score">Skor: 0</div>
+    <div id="intro">
+        <h1>BASKETBALL ARENA</h1>
+        <p>Hoş Geldiniz!</p>
+        <p>Oyunumuz 'Boşluk Tuşu' ile oynanmaktadır. </p>
+        <p>Genel amaç topla birlikte engellerden kaçmak ve potanın içinden geçmektir. Her isabet 1 puan değerindedir.</p>
+        <p>Nadir çıkan bonus hedefini vurabilirseniz 2 puan kazanabilirsiniz</p>
+        <p>NOT: Top potanın tam ortasından geçmelidir ve zeminden uzak durmalıdır. Aksi halde engele çarpmış sayılır.</p>
+        <button onclick="startGame()">Oyuna Başla</button>
+    </div>
+    <canvas id="myCanvas"></canvas>
+    <audio id="scoreSound" src="basket.wav"></audio>
+    <audio id="failSound" src="fail.wav"></audio>
+    <audio id="dingSound" src="ding.mp3"></audio>
+    <div ><button onclick="restartGame()" id="end">Tekrar Başla</button></div>
+    
+
+
+    <script>
+        var ball;
+        var target = [];    //hedeflerin dizisi
+        var gravity = 0.1;
+        var keys = {}; //boşluk tuşu kullanımı için gerekli değişken
+
+
+        function startGame(){
+            document.getElementById("end").style.display ="none";
+            document.getElementById("intro").style.display = "none"; //oyun başladığında intro ekranının gözükmesini engelliyor.
+            ball=new component(15,15,"basketbol.png",10,40,"image");
+            myBackground = new component(myGameArea.canvas.width, myGameArea.canvas.height, "court2.png", 0, 0, "background");
+            myGameArea.start();    
+        }
+        function restartGame() {
+            target = []; // Hedefleri temizle
+            myGameArea.score = 0; // Skoru sıfırla
+            document.getElementById("score").innerHTML = "Skor: " + myGameArea.score; // Skor alanını güncelle
+            startGame(); // Oyunu tekrar başlat
+        }
+
+        function playScoreSound() {
+            var scoreSound = document.getElementById("scoreSound");
+            scoreSound.play(); //basket olduğunda çalıyor
+        }
+
+        function playFailSound() {
+            var failSound = document.getElementById("failSound");
+            failSound.play(); //hata yapıldığında çalıyor
+        }
+        function playDingSound(){
+            var dingSound = document.getElementById("dingSound");
+            dingSound.play(); //bonus alındığında çalınıyor
+        }
+
+        var myGameArea = {
+            score:0, 
+            canIncreaseScore: true, // Skor artışı için bayrak değişkeni
+            scoreIncreaseInterval: 600, // Skor artışı aralığı (ms) 0.6 saniye
+            lastScoreIncreaseTime: 0, // Son skor artışının zamanı
+
+            canvas: document.getElementById("myCanvas"),
+            start: function() {
+                this.context = this.canvas.getContext("2d");
+                this.frameNo = 0;
+                document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                this.interval = setInterval(updateGameArea, 20);
+
+                // klavyeyi kullanabilmek için gerekli kod.
+                window.addEventListener('keydown', function(e) {
+                    keys[e.keyCode] = true;
+                });
+                window.addEventListener('keyup', function(e) {
+                    keys[e.keyCode] = false;
+                });
+
+            },
+            
+            stop: function() { //oyunu bitiren fonksiyorn
+                clearInterval(this.interval);
+            },    
+            clear: function() { 
+                this.context.clearRect(0, 0, this.canvas.width, this.canvas.height); //canvası temizliyor
+            },
+            updateScore: function(type) {
+                    var currentTime = new Date().getTime(); //o anki zamanı alan fonskiyon
+                    if (this.canIncreaseScore && currentTime - this.lastScoreIncreaseTime >= this.scoreIncreaseInterval) {
+                        //ball nesnesi potaya her temas ettiğinde skoru yalnızca 1 arttırabilmek için bu koşul kullanıldı. skor nesnesi her 3 saniyede yalnızca 1 kere artabilir.
+                        if(type=="target"){
+                            this.score += 1;
+                            playScoreSound(); // Skor arttığında müziği çal
+                        }
+                        else{
+                            this.score+=2;
+                            playDingSound(); //bonus alındığında 2 puan ver ve bu müziği çal
+                        }
+                        
+                        document.getElementById("score").innerHTML = "Skor: " + this.score;
+                        this.lastScoreIncreaseTime = currentTime;
+                        this.canIncreaseScore = false; // Bayrağı false yapar. 0.6 saniyeden çok geçmişse true olur
+                    }
+                
+            },
+                
+            showScore: function() { //skoru gösterir
+                var scoreElement = document.getElementById("score");
+                scoreElement.innerHTML = "Oyun Bitti! Skorunuz: " + this.score;
+                scoreElement.style.color = "red";
+            },
+
+        };
+
+        function component(width,height,src,x,y,type){
+            this.type = type;
+            this.image = new Image();//görüntü eklemek için gerekli
+            this.image.src = src;
+            
+            this.width = width;
+            this.height = height;
+            this.x = x;
+            this.y = y;
+            this.speedY = 0;
+            this.speedX = 0;
+
+            this.update = function(){
+                myGameArea.context.drawImage(this.image, this.x, this.y, this.width, this.height); //şekillerin yerini güncelliyor
+            }
+            this.newPos = function() {
+                if(type=="image"){
+                this.speedY += gravity;//yerçekimi topun yere yaklaşmasını sağlıyor.
+                this.y += this.speedY;
+                this.hitBottom();//zemine değip değmediği kontrol ediliyor
+                }
+                else{
+                    this.x += this.speedX;
+                    this.y += this.speedY; 
+                }
+            }
+            
+            this.hitBottom = function() {
+                var bottom = myGameArea.canvas.height - this.height; //topun zemine değip değmediği kontrol ediliyor.
+                if (this.y > bottom) {
+
+                    myGameArea.stop();
+                    playFailSound();
+                    alert("ZEMİNE DEĞDİNİZ. OYUN BİTTİ");
+                    myGameArea.showScore();
+                    document.getElementById("end").style.display ="block";
+                }
+            }
+            this.crashWith = function(otherobj) { //kaza kontrolü. alınan koordinaları karşılaştırıyor
+                var myleft = this.x;
+                var myright = this.x + (this.width);
+                var mytop = this.y;
+                var mybottom = this.y + (this.height);
+                var otherleft = otherobj.x+3;
+                var otherright = otherobj.x + (otherobj.width)-3;
+                var othertop = otherobj.y+3;
+                var otherbottom = otherobj.y + (otherobj.height)-3;
+                var crash = true;
+                
+
+                if ((mybottom < othertop) || (mytop > otherbottom) || (myright < otherleft) || (myleft > otherright)) {
+                    crash = false;
+                }
+                return crash;
+                    
+                }
+    
+        }
+
+        function updateGameArea() {
+            myGameArea.clear();
+            myBackground.update(); //arkaplan resmi
+            myBackground.newPos(); 
+            for (i = 0; i < target.length; i += 1) {
+                if(target[i].type=="target"||target[i].type=="bonus"){ //top pota veya bonusa çarptığı zamanlar çarpışma kontrolü yapmıyor.
+                    continue;
+                }
+                else{
+                    if (ball.crashWith(target[i])) { //kaza varsa oyun bitiyor
+                        alert("YASAKLI HEDEFE ÇARPTINIZ. OYUN BİTTİ");
+                        myGameArea.showScore();
+                        myGameArea.stop();
+                        playFailSound();
+                        document.getElementById("end").style.display ="block";                    
+                        return;
+                    }
+                }  
+            }
+            
+            myGameArea.frameNo += 1;
+            if (keys[32]) { // Boşluk tuşu
+                ball.speedY = -1.3; // Zıplama hızı. 
+            }
+            if (myGameArea.frameNo == 1 || everyinterval(70)) {
+                var y = Math.floor(Math.random() * (myGameArea.canvas.height - 30));//hedeflerin rastgele yükseklikte gelmesini sağlıyor
+                var x = myGameArea.canvas.width; 
+                var randomInteger = Math.floor(Math.random()*8)+1; //hedeflerin belirli oranlarda gelmesini sağlıyor. target=3/8, images=2/8, bonus=1/8 oranda gelebilir.
+                if(randomInteger==1||randomInteger==2){
+                    target.push(new component(20, 40, "block.png", x, y,"image"));
+                }
+                else if(randomInteger==3||randomInteger==4){
+                    target.push(new component(20, 40, "hakem.png", x, y,"image"));
+                }
+                else if(randomInteger==5){
+                    target.push(new component(15, 15, "x2.png", x, y,"bonus"));
+                }
+                else{
+                    target.push(new component(30, 30, "pota.png", x, y,"target"));
+                }
+            }
+            for (i = 0; i < target.length; i += 1) {
+                target[i].x += -2;
+                target[i].update(); //hedeflerin hareket fonksiyonu
+            }
+            ball.newPos();
+            ball.update();
+            for (i = 0; i < target.length; i += 1) {
+                if (ball.crashWith(target[i])) {
+                    if (target[i].type === "target") {
+                        myGameArea.updateScore(target[i].type); // Skoru artır
+                    }
+                    else if(target[i].type=="bonus"){
+                        myGameArea.updateScore(target[i].type);
+                    }
+                }
+            }
+            var currentTime = new Date().getTime();
+            if (currentTime - myGameArea.lastScoreIncreaseTime >= myGameArea.scoreIncreaseInterval) {
+                myGameArea.canIncreaseScore = true; // Skor artışı için bayrağı true yap
+            }
+            
+            for (var i = 0; i < target.length; i++) {
+                if (ball.crashWith(target[i])&&target[i].type!="bonus") { //çarpılan hedefin bonus olup olmadığını kontrol ediyor. potanın sadece altı ve üstü yasak.
+                    if (ball.y < target[i].y|| ball.y + ball.height > target[i].y + target[i].height) { // Ball target'in üstüne değdi
+                        myGameArea.stop();
+                        alert("YASAKLI HEDEFE ÇARPTINIZ. OYUN BİTTİ");
+                        playFailSound();
+                        myGameArea.showScore();
+                        document.getElementById("end").style.display ="block";
+                        return;
+                    }
+                    if (ball.y < target[i].y + target[i].height && ball.y + ball.height> target[i].y + target[i].height) { // Ball target'in altına değdi
+                        myGameArea.stop();
+                        alert("YASAKLI HEDEFE ÇARPTINIZ. OYUN BİTTİ");
+                        playFailSound();
+                        myGameArea.showScore();
+                        document.getElementById("end").style.display ="block";
+                        return;
+                    }
+                }
+            }
+        }
+        function everyinterval(n) {
+            if ((myGameArea.frameNo / n) % 1 == 0) {return true;}
+            return false;
+        }
+
+    </script>
+    
+</body>
+</html>
