@@ -1,6 +1,8 @@
 # Basketball Arena
 Mini HTML-JS oyunu
 
+Tanıtım Videosu: https://www.youtube.com/watch?v=r6bZtgPHRyc
+
 Oyunumuzdaki genel amaç topla birlikte engellerden kaçmak ve hedefleri tutturmaktır.
 
 Oyunumuz 'Boşluk Tuşu' ile oynanmaktadır.
